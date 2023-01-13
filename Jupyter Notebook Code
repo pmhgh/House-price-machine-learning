@@ -1,0 +1,211 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy import stats
+
+
+# Get Data
+
+df = pd.read_csv('housePrice.csv')
+df.head()
+
+df.describe()
+
+df.dtypes
+
+# Convert object to float in Area
+
+df['Area'] = pd.to_numeric(df['Area'],errors = 'coerce')
+df.dtypes
+
+# Remove NaN data
+
+df.isnull().sum()*100 / df.shape[0]
+
+df1 = df.dropna()
+len(df1)
+df1
+
+df1.isnull().sum()*100 / df1.shape[0]
+
+df1.info()
+
+df1.shape
+
+df1.info()
+
+df1['Area'] = df1['Area'].astype('int64')
+
+df1.info()
+
+q1 = np.percentile(df1['Area'],25,interpolation='midpoint')
+q3 = np.percentile(df1['Area'],75,interpolation='midpoint')
+IQR = q3 - q1
+IQR
+upper = q3 + 1.5 * IQR
+lower = q1 - 1.5 * IQR
+print('old shape:',df.shape)
+upper = np.where(df1['Area'] >= (q3 + 1.5* IQR))
+lower = np.where(df1['Area'] <= (q1 - 1.5* IQR))
+df1.drop(upper[0],inplace = True)
+df1.drop(lower[0],inplace = True)
+print('New shape:',df1.shape)
+
+# Outlier Treatment for Price
+Q1=df1['Price(USD)'].quantile(0.25)
+Q3=df1['Price(USD)'].quantile(0.75)
+IQR=Q3-Q1
+df1=df1[(df1['Price(USD)']>=Q1-1.5*IQR)&(df1['Price(USD)']<=Q3+1.5*IQR)]
+print('New shape:',df1.shape)
+
+df1.info()
+
+df1
+
+'''
+var =  ['Parking','Warehouse','Elevator']
+df1_clear = df1.copy()
+df1_clear = np.multiply(df1_clear,1)
+df1_clear
+'''
+
+var=['Parking','Warehouse','Elevator']
+def binary_map(x):
+    return x.map({True:1,False:0})
+df1_clear=df1.copy()
+df1_clear[var]=df1_clear[var].apply(binary_map)
+
+df1_clear
+
+import category_encoders as ce
+df1_clear_encode = df1_clear.copy()
+encoder = ce.TargetEncoder(cols = 'Address')
+new_address = encoder.fit_transform(df1_clear_encode['Address'],df1_clear_encode['Price'])
+df1_clear_encode['Address'] = new_address
+df1_clear_encode
+
+msk = np.random.rand(len(df1_clear_encode)) <0.8
+train = df1_clear_encode[msk]
+test = df1_clear_encode[~msk]
+
+train
+
+test
+
+from sklearn.preprocessing import MinMaxScaler
+num = ['Area','Room','Price','Price(USD)','Address']
+
+scaler = MinMaxScaler()
+train[num] = scaler.fit_transform(train[num])
+train
+
+test[num] = scaler.fit_transform(test[num])
+test
+
+import seaborn as sns
+%matplotlib inline
+cor = df1_clear_encode.corr()
+plt.figure(figsize  = (10,6))
+sns.heatmap(cor,annot = True)
+
+# Multiple Linear Regression
+
+from sklearn import linear_model
+from sklearn.preprocessing import PolynomialFeatures
+reg = linear_model.LinearRegression()
+
+trainx = np.asanyarray(train[['Area','Address']])
+trainy = np.asanyarray(train[['Price(USD)']])
+reg.fit(trainx,trainy)
+print('coef: ',reg.coef_,'intercept: %.2f'%reg.intercept_)
+
+yhat = reg.predict(test[['Address','Area']])
+x = np.asanyarray(test[['Address','Area']])
+y = np.asanyarray(test['Price(USD)'])
+
+print('Mean absolute error: %.2f' %np.mean(np.absolute(yhat - y)))
+
+from sklearn.metrics import r2_score
+
+print('Variance score: %.2f' % reg.score(x,y))
+print('R2-score: %.2f' % r2_score(y,yhat))
+print('Residual sum of squares: %.2f' % np.mean((yhat - y)**2) )
+
+x_train = np.asanyarray(train[['Area','Address','Room','Parking','Warehouse','Elevator']])
+y_train=np.asanyarray(train[['Price(USD)']])
+reg.fit(x_train,y_train)
+
+yhat = reg.predict(test[['Area','Address','Room','Parking','Warehouse','Elevator']])
+x = np.asanyarray(test[['Area','Address','Room','Parking','Warehouse','Elevator']])
+y = np.asanyarray(test['Price(USD)'])
+print('Mean absolute error: %.2f' %np.mean(np.absolute(yhat - y)))
+print('Variance score: %.2f' % reg.score(x,y))
+print('R2-score: %.2f' % r2_score(y,yhat))
+print('Residual sum of squares: %.2f' % np.mean((yhat - y)**2) )
+
+x_train = np.asanyarray(train[['Area','Address','Room','Parking','Warehouse','Elevator']])
+y_train=np.asanyarray(train[['Price(USD)']])
+reg.fit(x_train,y_train)
+
+yhat = reg.predict(test[['Area','Address','Room','Parking','Warehouse','Elevator']])
+x = np.asanyarray(test[['Area','Address','Room','Parking','Warehouse','Elevator']])
+y = np.asanyarray(test['Price(USD)'])
+print('Mean absolute error: %.2f' %np.mean(np.absolute(yhat - y)))
+print('Variance score: %.2f' % reg.score(x,y))
+print('R2-score: %.2f' % r2_score(y,yhat))
+print('Residual sum of squares: %.2f' % np.mean((yhat - y)**2) )
+
+# Polynomial Linear Regression
+
+x_train = np.asanyarray(train[['Area','Address','Room','Parking','Warehouse','Elevator']])
+y_train=np.asanyarray(train[['Price(USD)']])
+
+x = np.asanyarray(test[['Area','Address','Room','Parking','Warehouse','Elevator']])
+y = np.asanyarray(test['Price(USD)'])
+
+poly = PolynomialFeatures(degree = 2)
+trainpoly = poly.fit_transform(x_train)
+
+
+reg=linear_model.LinearRegression()
+reg.fit(trainpoly,y_train)
+
+print ('Coefficients: ', reg.coef_)
+print ('Intercept: ',reg.intercept_)
+
+testpoly=poly.fit_transform(x)
+testy=reg.predict(testpoly)
+
+
+
+print("Mean absolute error: %.2f" % np.mean(np.absolute(testy - y)))
+print("Residual sum of squares (MSE): %.2f" % np.mean((testy - y) ** 2))
+print("R2-score: %.2f" % r2_score(y,testy ) )
+
+
+x_train = np.asanyarray(train[['Area','Address','Room','Parking','Warehouse','Elevator']])
+y_train=np.asanyarray(train[['Price(USD)']])
+
+x = np.asanyarray(test[['Area','Address','Room','Parking','Warehouse','Elevator']])
+y = np.asanyarray(test['Price(USD)'])
+
+poly = PolynomialFeatures(degree = 3)
+trainpoly = poly.fit_transform(x_train)
+
+
+reg=linear_model.LinearRegression()
+reg.fit(trainpoly,y_train)
+
+print ('Coefficients: ', reg.coef_)
+print ('Intercept: ',reg.intercept_)
+
+testpoly=poly.fit_transform(x)
+testy=reg.predict(testpoly)
+
+
+
+print("Mean absolute error: %.2f" % np.mean(np.absolute(testy - y)))
+print("Residual sum of squares (MSE): %.2f" % np.mean((testy - y) ** 2))
+print("R2-score: %.2f" % r2_score(y,testy ) )
+
+
